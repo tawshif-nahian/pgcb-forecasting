@@ -1,0 +1,151 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+# Page Configuration
+st.set_page_config(
+    page_title="PGCB Power Demand Dashboard", page_icon="⚡", layout="wide"
+)
+
+st.title("⚡ PGCB Power Demand Forecasting Dashboard")
+st.markdown(
+    "Web-Based Remote Monitoring & AI Forecasting System for Bangladesh's"
+    " Power Grid."
+)
+
+# Load Exported Data from Notebook
+try:
+  data = pd.read_csv("dashboard_data.csv", parse_dates=["datetime"])
+  metrics = pd.read_csv("dashboard_metrics.csv")
+except FileNotFoundError:
+  st.error(
+      "⚠️ CSV files not found! Make sure 'dashboard_data.csv' and"
+      " 'dashboard_metrics.csv' exist in the 'dashboard' folder."
+  )
+  st.stop()
+
+# --- Part B.3: Summary Panel ---
+st.subheader("📌 Key Grid Metrics & Model Performance")
+
+col1, col2, col3, col4 = st.columns(4)
+
+# Calculate quick stats from historical actuals
+latest_val = data["actual"].dropna().iloc[-1]
+peak_val = data["actual"].max()
+avg_val = data["actual"].mean()
+
+xgb_mape = metrics.loc[metrics["model"] == "XGBoost", "MAPE"].values[0]
+lstm_mape = metrics.loc[metrics["model"] == "LSTM", "MAPE"].values[0]
+
+with col1:
+  st.metric(
+      label="Latest Actual Demand",
+      value=f"{latest_val:,.1f} MW",
+  )
+with col2:
+  st.metric(
+      label="Historical Peak Demand",
+      value=f"{peak_val:,.1f} MW",
+  )
+with col3:
+  st.metric(
+      label="XGBoost Error (MAPE)",
+      value=f"{xgb_mape:.2f}%",
+  )
+with col4:
+  st.metric(
+      label="LSTM Error (MAPE)",
+      value=f"{lstm_mape:.2f}%",
+  )
+
+st.write("---")
+
+# --- Part B.3: Interactive Controls ---
+st.subheader("🎛️ Interactive Forecast Controls")
+
+control_col1, control_col2 = st.columns(2)
+
+with control_col1:
+  selected_model = st.selectbox(
+      "Select Forecasting Model",
+      ["XGBoost", "LSTM"],
+      help="Choose which AI model forecast and confidence interval to view.",
+  )
+
+with control_col2:
+  date_range = st.date_input(
+      "Filter Date Range",
+      value=(data["datetime"].min().date(), data["datetime"].max().date()),
+      min_value=data["datetime"].min().date(),
+      max_value=data["datetime"].max().date(),
+  )
+
+# Filter dataset based on selected date range
+if len(date_range) == 2:
+  start_date, end_date = date_range
+  filtered_data = data[
+      (data["datetime"].dt.date >= start_date)
+      & (data["datetime"].dt.date <= end_date)
+  ]
+else:
+  filtered_data = data
+
+# --- Part B.1 & B.2: Forecast Chart with Confidence Bands ---
+st.subheader(f"📈 Hourly Generation Forecast: {selected_model}")
+
+fig, ax = plt.subplots(figsize=(14, 6))
+
+# Plot historical actual generation
+ax.plot(
+    filtered_data["datetime"],
+    filtered_data["actual"],
+    label="Actual Historical Demand",
+    color="black",
+    alpha=0.6,
+    linewidth=1,
+)
+
+if selected_model == "XGBoost":
+  ax.plot(
+      filtered_data["datetime"],
+      filtered_data["xgb_pred"],
+      label="XGBoost Forecast",
+      color="tab:orange",
+      linewidth=1.2,
+  )
+  ax.fill_between(
+      filtered_data["datetime"],
+      filtered_data["xgb_lower"],
+      filtered_data["xgb_upper"],
+      color="tab:orange",
+      alpha=0.25,
+      label="XGBoost 95% Confidence Interval",
+  )
+else:
+  ax.plot(
+      filtered_data["datetime"],
+      filtered_data["lstm_pred"],
+      label="LSTM Forecast",
+      color="tab:blue",
+      linewidth=1.2,
+  )
+  ax.fill_between(
+      filtered_data["datetime"],
+      filtered_data["lstm_lower"],
+      filtered_data["lstm_upper"],
+      color="tab:blue",
+      alpha=0.25,
+      label="LSTM 95% Confidence Interval",
+  )
+
+ax.set_ylabel("Power Generation (MW)")
+ax.set_xlabel("Datetime")
+ax.legend(loc="upper left")
+ax.grid(True, alpha=0.3)
+
+st.pyplot(fig)
+
+# Display evaluation metrics table
+with st.expander("🔍 View Detailed Evaluation Metrics Table"):
+  st.table(metrics)
