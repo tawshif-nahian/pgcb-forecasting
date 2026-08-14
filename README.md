@@ -1,7 +1,6 @@
 # PGCB Hourly Power Generation Forecasting
 
-A forecasting system for Bangladesh's power grid, built for the **AI and Web RA Recruitment Task** (BEPRC / Daffodil International University). Uses the PGCB Hourly Generation Dataset to train and compare a classical ML model and a deep learning model, then serves the results through an interactive web dashboard.
-
+An end-to-end time-series forecasting pipeline using XGBoost and LSTM deep learning to predict national grid generation (MW). Features 72-hour recursive forecasting, residual-based 95% confidence intervals, and an interactive Streamlit analytical dashboard.
 ## Overview
 
 - **Target:** hourly power generation (MW)
